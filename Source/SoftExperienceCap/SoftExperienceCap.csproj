@@ -70,6 +70,7 @@
 xcopy $(TargetPath) $(SolutionDir)..\Release\$(TargetName)\ /Y
 xcopy $(ProjectDir)mod.json $(SolutionDir)..\Release\$(TargetName)\ /Y
 xcopy $(ProjectDir)README.md $(SolutionDir)..\Release\$(TargetName)\ /Y
+xcopy $(ProjectDir)README.md $(SolutionDir)..\ /Y
 xcopy $(ProjectDir)StreamingAssets\data\shipUpgrades\*.json $(SolutionDir)..\Release\$(TargetName)\StreamingAssets\data\shipUpgrades\ /Y
 	</PostBuildEvent>
   </PropertyGroup>
