@@ -1,6 +1,6 @@
 # Soft Experience Cap
 
-[Battletech Mod][ModTek] Mission experience only gets rewarded up to a certain limit which is expandable with the right Argo Upgrades. If mechwarriors reach this experience cap they'll only get additional XP for each killed opponent on the field.
+[Battletech Mod][ModTek] Mission experience only gets rewarded up to a certain limit which is expandable with the right Argo Upgrades.
 
 ## Gameplay changes
 * Pilots gain experience normally until they hit the current limit
