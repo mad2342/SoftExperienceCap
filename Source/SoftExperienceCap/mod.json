@@ -1,0 +1,10 @@
+{
+    "Name": "SoftExperienceCap",
+    "Enabled": true,
+
+    "Version": "0.1",
+    "Description": "Soft XP Cap",
+    "Author": "Ben",
+	
+	"DLL": "SoftExperienceCap.dll",
+}
