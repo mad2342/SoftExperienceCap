@@ -5,9 +5,8 @@ using System.Text;
 using System.Reflection;
 using Harmony;
 using BattleTech;
-using BattleTech.UI;
-using System.IO;
-using Localize;
+
+
 
 namespace SoftExperienceCap
 {

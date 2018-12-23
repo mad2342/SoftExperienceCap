@@ -1,13 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
 using System.Reflection;
 using Harmony;
 using BattleTech;
 using BattleTech.UI;
-using System.IO;
-using Localize;
 
 
 
@@ -22,6 +17,9 @@ namespace SoftExperienceCap
 
         internal static int[] xpCapByArgoState = new int[] { 25000, 30000, 40000, 60000 };
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
+        internal static int xpMissionMinimum = 10;
+        internal static int xpMissionMechKilled = 100;
+        internal static int xpMissionOtherKilled = 50;
 
         public static void Init(string directory, string settingsJSON)
         {
@@ -100,7 +98,7 @@ namespace SoftExperienceCap
                 Pilot p = ___UnitData.pilot;
                 PilotDef pDef = p.pilotDef;
 
-                int xpMinimum = 10; // Just for the thrill of it
+                int xpMinimum = SoftExperienceCap.xpMissionMinimum; // Just for the thrill of it
                 int xpLimit = 114000; // All skills at 10
 
                 int xpSoftCap = Utilities.GetCurrentExperienceCap(___simState);
@@ -135,11 +133,11 @@ namespace SoftExperienceCap
                 // Always get XP for kills
                 for (int i = 0; i < p.MechsKilled; i++)
                 {
-                    xpTemp += 100;
+                    xpTemp += SoftExperienceCap.xpMissionMechKilled;
                 }
                 for (int j = 0; j < p.OthersKilled; j++)
                 {
-                    xpTemp += 50;
+                    xpTemp += SoftExperienceCap.xpMissionOtherKilled;
                 }
                 // Absolutely no XP when at games hard limit?
                 if (AbsoluteExperience >= xpLimit)
