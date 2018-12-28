@@ -2,9 +2,25 @@
     "Name": "SoftExperienceCap",
     "Enabled": true,
 
-    "Version": "0.1",
-    "Description": "Soft XP Cap",
-    "Author": "Ben",
+    "Version": "1.3.1-001R",
+    "Description": "Mission experience only gets rewarded up to a certain limit which is expandable with the right Argo Upgrades.",
+    "Author": "Mad",
 	
 	"DLL": "SoftExperienceCap.dll",
+
+	"Settings": {
+        "xpCapByArgoState": [
+			25000,
+			30000,
+			40000,
+			60000
+		],
+        "xpMissionMinimum": 100,
+        "xpMissionMechKilled": 100,
+        "xpMissionOtherKilled": 50,
+
+        "ApplyPilotRespec": true,
+        "ForcePilotRespec": false,
+        "CommanderRespec": true
+    }
 }
