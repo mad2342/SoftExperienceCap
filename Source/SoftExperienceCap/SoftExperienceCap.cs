@@ -14,7 +14,7 @@ namespace SoftExperienceCap
         internal static Settings Settings;
 
         // BEN: Debug (0: nothing, 1: errors, 2:all)
-        internal static int DebugLevel = 1;
+        internal static int DebugLevel = 2;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
@@ -23,7 +23,7 @@ namespace SoftExperienceCap
 
         public static void Init(string directory, string settings)
         {
-            var harmony = HarmonyInstance.Create("de.ben.SoftExperienceCap");
+            var harmony = HarmonyInstance.Create("de.mad.SoftExperienceCap");
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             ModDirectory = directory;
@@ -43,6 +43,13 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(SimGameState), "_OnAttachUXComplete")]
     public static class SimGameState__OnAttachUXComplete_Patch
     {
+        public static void Prefix(SimGameState __instance)
+
+        {
+            // TEST
+            //__instance.CompanyTags.Remove("patch_1_2_abilities");
+        }
+
         public static void Postfix(SimGameState __instance)
 
         {
@@ -101,12 +108,13 @@ namespace SoftExperienceCap
                 PilotDef pDef = p.pilotDef;
 
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] " + p.Name + "s AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
-                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] " + p.Name + " ExperienceSpent: " + pDef.ExperienceSpent);
-                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] " + p.Name + " TotalXP: " + p.TotalXP);
-                int SurplusXP = p.TotalXP - pDef.ExperienceSpent; Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] " + p.Name + "s SurplusXP: " + SurplusXP);
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
+                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") ExperienceSpent: " + pDef.ExperienceSpent);
+                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") TotalXP: " + p.TotalXP);
+                int SurplusXP = p.TotalXP - pDef.ExperienceSpent;
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") SurplusXP: " + SurplusXP);
                 int AbsoluteExperience = AbsoluteExperienceSpent + SurplusXP;
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] " + p.Name + "s AbsoluteExperience: " + AbsoluteExperience);
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
             }
             catch (Exception e)
             {
@@ -134,14 +142,14 @@ namespace SoftExperienceCap
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] Current xpSoftCap: " + xpSoftCap);
 
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
 
                 int SurplusXP = p.TotalXP - pDef.ExperienceSpent; Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s SurplusXP: " + SurplusXP);
                 int AbsoluteExperience = AbsoluteExperienceSpent + SurplusXP;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s AbsoluteExperience: " + AbsoluteExperience);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
 
                 int PotentialExperienceAfterMissionReward = AbsoluteExperience + xpEarned;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s PotentialExperienceAfterMissionReward: " + PotentialExperienceAfterMissionReward);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") PotentialExperienceAfterMissionReward: " + PotentialExperienceAfterMissionReward);
 
 
 
@@ -151,13 +159,13 @@ namespace SoftExperienceCap
                 if (AbsoluteExperience >= xpSoftCap)
                 {
                     xpTemp = xpMinimum;
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s experience is above cap. Gaining only minimum XP.");
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") experience is above cap. Gaining only minimum XP.");
                 }
                 // Not more than XPCap + minimum XP
                 if (AbsoluteExperience < xpSoftCap && PotentialExperienceAfterMissionReward >= xpSoftCap)
                 {
                     xpTemp = (PotentialExperienceAfterMissionReward - xpSoftCap) + xpMinimum;
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] " + p.Name + "s experience is hitting cap. Gaining less XP.");
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") experience is hitting cap. Gaining less XP.");
                 }
                 // Absolutely no XP when at games hard limit?
                 if (AbsoluteExperience >= xpLimit)

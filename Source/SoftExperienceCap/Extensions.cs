@@ -33,10 +33,15 @@ namespace SoftExperienceCap
 
         public static bool ApplyExperienceCap(this SimGameState simGameState)
         {
-            foreach (string tag in simGameState.CompanyTags.ToArray())
-            {
-                Logger.LogLine("[Extensions.ApplyExperienceCap] SimGameState.CompanyTag: " + tag);
-            }
+            // CHECK
+            //foreach (string tag in simGameState.CompanyTags.ToArray())
+            //{
+            //    Logger.LogLine("[Extensions.ApplyExperienceCap] SimGameState.CompanyTag: " + tag);
+            //}
+            //foreach (string tag in simGameState.Constants.Story.CampaignCommanderUpdateTags)
+            //{
+            //    Logger.LogLine("[Extensions.ApplyExperienceCap] SimGameState.Constants.Story.CampaignCommanderUpdateTags: " + tag);
+            //}
 
             if (SoftExperienceCap.Settings.ApplyPilotRespec && !simGameState.CompanyTags.Contains(SoftExperienceCap.CampaignCommanderUpdateTag))
             {
@@ -78,7 +83,7 @@ namespace SoftExperienceCap
         public static void ResetExperienceForPilot(this SimGameState simGameState, Pilot pilot)
         {
             // @ToDo: Remove unnecessary code/vars
-            Logger.LogLine("[Extensions.ResetExperienceForPilot] Will calculate current xp, reset skills and cap reallocated experience as defined in settings");
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") Calculate current xp, reset skills and cap reallocated experience as defined in settings");
 
             PilotDef pDef = pilot.pilotDef.CopyToSim();
             int xpSoftCap = simGameState.GetCurrentExperienceCap();
@@ -89,24 +94,24 @@ namespace SoftExperienceCap
             int xpTotal = 0;
             int xpToReallocate = 0;
 
+            xpBase += simGameState.GetLevelRangeCost(0, pDef.BasePiloting - 1);
             if (pDef.BonusPiloting > 0)
             {
-                xpBase += simGameState.GetLevelRangeCost(0, pDef.BasePiloting - 1);
                 xpAboveBase += simGameState.GetLevelRangeCost(pDef.BasePiloting, pDef.SkillPiloting - 1);
             }
+            xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseGunnery - 1);
             if (pDef.BonusGunnery > 0)
             {
-                xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseGunnery - 1);
                 xpAboveBase += simGameState.GetLevelRangeCost(pDef.BaseGunnery, pDef.SkillGunnery - 1);
             }
+            xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseGuts - 1);
             if (pDef.BonusGuts > 0)
             {
-                xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseGuts - 1);
                 xpAboveBase += simGameState.GetLevelRangeCost(pDef.BaseGuts, pDef.SkillGuts - 1);
             }
+            xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseTactics - 1);
             if (pDef.BonusTactics > 0)
             {
-                xpBase += simGameState.GetLevelRangeCost(0, pDef.BaseTactics - 1);
                 xpAboveBase += simGameState.GetLevelRangeCost(pDef.BaseTactics, pDef.SkillTactics - 1);
             }
 
@@ -120,12 +125,12 @@ namespace SoftExperienceCap
             xpSpent = xpBase + xpAboveBase;
             xpTotal = xpSpent + xpUnspent;
 
-            Logger.LogLine("[Extensions.ResetExperienceForPilot] Current xpSoftCap: " + xpSoftCap);
-            Logger.LogLine("[Extensions.ResetExperienceForPilot] " + pilot.Name + "s xpBase: " + xpBase);
-            //Logger.LogLine("[Extensions.ResetExperienceForPilot] " + pilot.Name + "s xpAboveBase: " + xpAboveBase);
-            //Logger.LogLine("[Extensions.ResetExperienceForPilot] " + pilot.Name + "s xpSpent: " + xpSpent);
-            //Logger.LogLine("[Extensions.ResetExperienceForPilot] " + pilot.Name + "s xpUnspent: " + xpUnspent);
-            Logger.LogLine("[Extensions.ResetExperienceForPilot] " + pilot.Name + "s xpTotal: " + xpTotal);
+            //Logger.LogLine("[Extensions.ResetExperienceForPilot] Current xpSoftCap: " + xpSoftCap);
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") xpBase: " + xpBase);
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") xpAboveBase: " + xpAboveBase);
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") xpSpent: " + xpSpent);
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") xpUnspent: " + xpUnspent);
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") xpTotal: " + xpTotal);
 
             if (xpTotal <= xpSoftCap)
             {
@@ -140,17 +145,31 @@ namespace SoftExperienceCap
             // Reset
             pDef.abilityDefNames.Clear();
             List<string> abilities = SimGameState.GetAbilities(pDef.BaseGunnery, pDef.BasePiloting, pDef.BaseGuts, pDef.BaseTactics);
+
+            // CHECK
+            //foreach (string ability in abilities)
+            //{
+            //    Logger.LogLine("[Extensions.ResetExperienceForPilot] abilities: " + ability);
+            //}
+
             pDef.abilityDefNames.AddRange(abilities);
             pDef.SetSpentExperience(0);
             pDef.ForceRefreshAbilityDefs();
+
+            // CHECK
+            //foreach (AbilityDef ability in pDef.AbilityDefs)
+            //{
+            //    Logger.LogLine("[Extensions.ResetExperienceForPilot] pDef.AbilityDefs: " + ability.Description.Id);
+            //}
+
             pDef.ResetBonusStats();
             pilot.FromPilotDef(pDef);
 
             // Add xp <= current cap
             pilot.StatCollection.Set<int>("ExperienceUnspent", xpToReallocate);
-            pDef.SetUnspentExperience(pilot.StatCollection.GetValue<int>("ExperienceUnspent"));
+            pilot.pilotDef.SetUnspentExperience(pilot.StatCollection.GetValue<int>("ExperienceUnspent"));
 
-            Logger.LogLine("[Extensions.ResetExperienceForPilot] CHECK: " + pilot.Name + "s AbsoluteExperienceAfter: " + (Utilities.GetAbsoluteExperienceSpent(pDef, simGameState) + xpToReallocate));
+            Logger.LogLine("[Extensions.ResetExperienceForPilot] (" + pilot.Name + ") AbsoluteExperienceAfter: " + (Utilities.GetAbsoluteExperienceSpent(pilot.pilotDef, simGameState) + xpToReallocate));
 
             // Mark this reset as done if not already
             if (!simGameState.CompanyTags.Contains(SoftExperienceCap.CampaignCommanderUpdateTag))
