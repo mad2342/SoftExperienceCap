@@ -7,8 +7,7 @@ using TMPro;
 using Newtonsoft.Json;
 using UnityEngine;
 using HBS;
-
-
+using System.Collections.Generic;
 
 namespace SoftExperienceCap
 {
@@ -19,6 +18,9 @@ namespace SoftExperienceCap
 
         // BEN: Debug (0: nothing, 1: errors, 2:all)
         internal static int DebugLevel = 2;
+
+        internal static int xpBonusUnstaffed = 0;
+        internal static int xpBonusUnstaffedBase = 100;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
@@ -111,13 +113,15 @@ namespace SoftExperienceCap
             {
                 PilotDef pDef = p.pilotDef;
 
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") ExperienceSpent: " + pDef.ExperienceSpent);
+
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
                 Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
-                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") ExperienceSpent: " + pDef.ExperienceSpent);
-                //Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") TotalXP: " + p.TotalXP);
-                int SurplusXP = p.TotalXP - pDef.ExperienceSpent;
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") SurplusXP: " + SurplusXP);
-                int AbsoluteExperience = AbsoluteExperienceSpent + SurplusXP;
+                
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") TotalXP: " + p.TotalXP);
+                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") UnspentXP: " + p.UnspentXP);
+
+                int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
                 Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
             }
             catch (Exception e)
@@ -128,7 +132,9 @@ namespace SoftExperienceCap
     }
 
     /*
-     * BEN: This is the real shit. For now i'm patching into this ONLY to check that my data injection via UI-Patches actually get called AFTER this.
+     * BEN: This is the real shit.
+     * For now i'm patching into this ONLY to check that my data injection via UI-Patches actually get called AFTER this...
+     * And to verify calculations regarding the actual XP earned.
      */
     [HarmonyPatch(typeof(Contract), "CompleteContract")]
     public static class Contract_CompleteContract_Patch
@@ -149,10 +155,53 @@ namespace SoftExperienceCap
     }
 
 
-    [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInData")]
-    public static class AAR_UnitStatusWidget_FillInData_Patch
+    [HarmonyPatch(typeof(AAR_UnitsResult_Screen), "FillInData")]
+    public static class AAR_UnitsResult_Screen_FillInData_Patch
     {
-        public static void Prefix(AAR_UnitStatusWidget __instance, ref int xpEarned, SimGameState ___simState, UnitResult ___UnitData)
+        public static void Prefix(AAR_UnitsResult_Screen __instance, List<AAR_UnitStatusWidget> ___UnitWidgets, Contract ___theContract)
+        {
+            try
+            {
+                int ExperienceEarned = ___theContract.ExperienceEarned;
+                Logger.LogLine("[AAR_UnitsResult_Screen_FillInData_PREFIX] ExperienceEarned: " + ExperienceEarned);
+
+                /*
+                int UnstaffedUnits = 0;
+                int BonusMultiplier = 1;
+
+                for (int i = 0; i < 4; i++)
+                {
+                    if (___UnitWidgets[i] == null)
+                    {
+                        UnstaffedUnits++;
+                        BonusMultiplier = BonusMultiplier * UnstaffedUnits;
+                    }
+                }
+                */
+
+                //TEST
+                int UnstaffedUnits = 2;
+                int BonusMultiplier = 2;
+
+                if (UnstaffedUnits > 0)
+                {
+                    SoftExperienceCap.xpBonusUnstaffed = BonusMultiplier * SoftExperienceCap.xpBonusUnstaffedBase;
+                }
+
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e);
+            }
+        }
+    }
+
+
+
+    [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInPilotData")]
+    public static class AAR_UnitStatusWidget_FillInPilotData_Patch
+    {
+        public static void Prefix(AAR_UnitStatusWidget __instance, ref int xpEarned, SimGameState ___simState, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SGBarracksRosterSlot ___PilotWidget)
         {
             try
             {
@@ -161,47 +210,68 @@ namespace SoftExperienceCap
 
                 Pilot p = ___UnitData.pilot;
                 PilotDef pDef = p.pilotDef;
+                Color red = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.red;
+                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
+                Color green = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.green;
+                string htmlColorTag = "";
 
                 int xpMinimum = SoftExperienceCap.Settings.xpMissionMinimum; // Just for the thrill of it
-                int xpLimit = 114000; // All skills at 10
+                int xpHardLimit = 114000; // All skills at 10
 
                 int xpSoftCap = ___simState.GetCurrentExperienceCap();
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] Current xpSoftCap: " + xpSoftCap);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Current xpSoftCap: " + xpSoftCap);
 
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
 
-                int SurplusXP = p.TotalXP - pDef.ExperienceSpent - xpEarned;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") SurplusXP: " + SurplusXP + "(already substracted xpEarned of: " + xpEarned + ")");
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") UnspentXP: " + p.UnspentXP + "(still includes uncorrected xpEarned of: " + xpEarned + ")");
+                int PostMissionUnspentXP = p.UnspentXP;
+                int PreMissionUnspentXP = p.UnspentXP - xpEarned;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PostMissionUnspentXP: " + PostMissionUnspentXP);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionUnspentXP: " + PreMissionUnspentXP);
 
-                int AbsoluteExperience = AbsoluteExperienceSpent + SurplusXP;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
 
-                int PotentialExperienceAfterMissionReward = AbsoluteExperience + xpEarned;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") PotentialExperienceAfterMissionReward: " + PotentialExperienceAfterMissionReward);
+                int PreMissionAbsoluteExperience = AbsoluteExperienceSpent + PreMissionUnspentXP;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionAbsoluteExperience: " + PreMissionAbsoluteExperience);
+
+                int PotentialExperiencePostMission = AbsoluteExperienceSpent + PostMissionUnspentXP;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PotentialExperiencePostMission: " + PotentialExperiencePostMission);
 
 
 
                 int xpTemp = xpEarned;
 
-                // Only minimum XP if already at XPCap
-                if (AbsoluteExperience >= xpSoftCap)
-                {
-                    xpTemp = xpMinimum;
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") Experience is above cap. Gaining only minimum XP.");
-                }
-                // Not more than XPCap + minimum XP
-                if (AbsoluteExperience < xpSoftCap && PotentialExperienceAfterMissionReward >= xpSoftCap)
-                {
-                    xpTemp = (PotentialExperienceAfterMissionReward - xpSoftCap) + xpMinimum;
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP.");
-                }
                 // Absolutely no XP when at games hard limit?
-                if (AbsoluteExperience >= xpLimit)
+                if (PreMissionAbsoluteExperience >= xpHardLimit)
                 {
                     xpTemp = 0;
+                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
+
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was at BTGs absolute maximum. Gaining no XP for the mission.");
                 }
+                // Only minimum XP if already at XPCap before mission
+                else if (PreMissionAbsoluteExperience >= xpSoftCap)
+                {
+                    xpTemp = xpMinimum;
+                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
+
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was already above cap. Gaining only minimum XP for the mission.");
+                }
+                // Not more than XPCap + minimum XP
+                else if (PreMissionAbsoluteExperience < xpSoftCap && PotentialExperiencePostMission >= xpSoftCap)
+                {
+                    xpTemp = (PotentialExperiencePostMission - xpSoftCap) + xpMinimum;
+                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
+
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP for the mission.");
+                }
+                // Normal XP
+                else
+                {
+                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
+
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is below cap. Gaining normal XP for the mission.");
+                }
+
                 // Always get XP for kills
                 for (int i = 0; i < p.MechsKilled; i++)
                 {
@@ -212,81 +282,19 @@ namespace SoftExperienceCap
                     xpTemp += SoftExperienceCap.Settings.xpMissionOtherKilled;
                 }
 
-                // Set/Adjust unspent experience 
-                int unspentXP = p.UnspentXP; // At this point UnspentXP still includes the originally earned XP so unmodified xpEarned needs to be substracted first
-                int adjustedUnspentXP = unspentXP - xpEarned + xpTemp;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") adjustedUnspentXP: " + adjustedUnspentXP);
-                p.StatCollection.Set<int>("ExperienceUnspent", adjustedUnspentXP);
-                pDef.SetUnspentExperience(adjustedUnspentXP);
+                // Bonus XP for being understaffed?
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") SoftExperienceCap.xpBonusUnstaffed: " + SoftExperienceCap.xpBonusUnstaffed);
+
+                // Adjust unspent experience 
+                int AdjustedUnspentXP = PreMissionUnspentXP + xpTemp;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AdjustedUnspentXP: " + AdjustedUnspentXP);
+                p.StatCollection.Set<int>("ExperienceUnspent", AdjustedUnspentXP);
+                pDef.SetUnspentExperience(AdjustedUnspentXP);
 
                 // Modify for UI
                 xpEarned = xpTemp;
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-            }
-        }
-        public static void Postfix(AAR_UnitStatusWidget __instance, UnitResult ___UnitData)
-        {
-            try
-            {
-                Pilot p = ___UnitData.pilot;
 
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_POSTFIX] CHECK (" + p.Name + ") UnspentXP: " + p.UnspentXP);
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-            }
-        }
-    }
-
-    [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInPilotData")]
-    public static class AAR_UnitStatusWidget_FillInPilotData_Patch
-    {
-        public static void Postfix(AAR_UnitStatusWidget __instance, int xpEarned, SimGameState ___simState, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SGBarracksRosterSlot ___PilotWidget)
-        {
-            try
-            {
-                Pilot p = ___UnitData.pilot;
-                PilotDef pDef = p.pilotDef;
-
-                int xpSoftCap = ___simState.GetCurrentExperienceCap();
-                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                int UnspentXP = p.UnspentXP;
-                int AbsoluteExperience = AbsoluteExperienceSpent + UnspentXP;
-                
-                // NOTE that xpEarned is already adjusted at this point
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] (" + p.Name + ") xpEarned: " + xpEarned);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
-
-                /*
-                ___XPText.SetText("+{0}XP ({1} / {2}XP)", new object[]
-                {
-                    xpEarned,
-                    AbsoluteExperience,
-                    xpSoftCap
-                });
-                */
-
-                Color red = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.red;
-                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
-                Color green = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.green;
-                string htmlColorTag = "";
-                if (AbsoluteExperience > xpSoftCap)
-                {
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
-                }
-                //else if ((AbsoluteExperience + xpEarned) > xpSoftCap)
-                //{
-                //    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
-                //}
-                else
-                {
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
-                }
-
+                // Show additional info about current/maximum XP in UI
                 TextMeshProUGUI callsign = (TextMeshProUGUI)AccessTools.Field(typeof(SGBarracksRosterSlot), "callsign").GetValue(___PilotWidget);
                 callsign.enableAutoSizing = false;
                 callsign.enableWordWrapping = false;
@@ -296,10 +304,30 @@ namespace SoftExperienceCap
                 callsign.SetText("{0} " + htmlColorTag + "({1} / {2}XP)</color>", new object[]
                 {
                     p.Callsign,
-                    AbsoluteExperience,
+                    //PotentialExperiencePostMission,
+                    PreMissionAbsoluteExperience,
                     xpSoftCap
                 });
 
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e);
+            }
+        }
+        public static void Postfix(AAR_UnitStatusWidget __instance, UnitResult ___UnitData, SimGameState ___simState)
+        {
+            try
+            {
+                Pilot p = ___UnitData.pilot;
+                PilotDef pDef = p.pilotDef;
+
+                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
+                int UnspentXP = p.UnspentXP;
+                int AbsoluteExperience = AbsoluteExperienceSpent + UnspentXP;
+
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] CHECK (" + p.Name + ") UnspentXP: " + p.UnspentXP);
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] CHECK (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
             }
             catch (Exception e)
             {
