@@ -15,7 +15,7 @@
 			40000,
 			60000
 		],
-        "xpMissionMinimum": 100,
+        "xpMissionMinimum": 0,
         "xpMissionMechKilled": 100,
         "xpMissionOtherKilled": 50,
 
