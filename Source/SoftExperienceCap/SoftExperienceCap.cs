@@ -8,6 +8,7 @@ using Newtonsoft.Json;
 using UnityEngine;
 using HBS;
 using System.Collections.Generic;
+using BattleTech.UI.Tooltips;
 
 namespace SoftExperienceCap
 {
@@ -19,8 +20,10 @@ namespace SoftExperienceCap
         // BEN: Debug (0: nothing, 1: errors, 2:all)
         internal static int DebugLevel = 2;
 
-        internal static int xpBonusUnstaffed = 0;
-        internal static int xpBonusUnstaffedBase = 100;
+        internal static int xpBonusUnderstaffed = 0;
+        internal static int xpBonusUnderstaffedBase = 200;
+        internal static int xpBonusUnderweight = 0;
+        internal static int xpBonusUnderweightPerTon = 10;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
@@ -158,17 +161,28 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(AAR_UnitsResult_Screen), "FillInData")]
     public static class AAR_UnitsResult_Screen_FillInData_Patch
     {
-        public static void Prefix(AAR_UnitsResult_Screen __instance, List<AAR_UnitStatusWidget> ___UnitWidgets, Contract ___theContract)
+        public static void Prefix(AAR_UnitsResult_Screen __instance, List<AAR_UnitStatusWidget> ___UnitWidgets, List<UnitResult> ___UnitResults, int ___numUnits, Contract ___theContract)
         {
             try
             {
+                /*
                 int ExperienceEarned = ___theContract.ExperienceEarned;
                 Logger.LogLine("[AAR_UnitsResult_Screen_FillInData_PREFIX] ExperienceEarned: " + ExperienceEarned);
+                int ContractDifficulty = ___theContract.Difficulty;
+                Logger.LogLine("[AAR_UnitsResult_Screen_FillInData_PREFIX] ContractDifficulty: " + ContractDifficulty);
 
-                /*
                 int UnstaffedUnits = 0;
                 int BonusMultiplier = 1;
 
+                float CombinedTonnage = 0f;
+                foreach (UnitResult unitResult in ___UnitResults)
+                {
+                    CombinedTonnage += unitResult.mech.Chassis.Tonnage;
+                }
+                // @ToDo: Compare ContractDifficulty with calculated difficulty from CombinedTonnage -> Store bonus XP
+
+
+                // @ToDo: Use ___numUnits and explicitely set bonus for understaffed with switch 1-4
                 for (int i = 0; i < 4; i++)
                 {
                     if (___UnitWidgets[i] == null)
@@ -177,16 +191,20 @@ namespace SoftExperienceCap
                         BonusMultiplier = BonusMultiplier * UnstaffedUnits;
                     }
                 }
-                */
 
                 //TEST
-                int UnstaffedUnits = 2;
-                int BonusMultiplier = 2;
+                //int UnstaffedUnits = 2;
+                //int BonusMultiplier = 2;
 
                 if (UnstaffedUnits > 0)
                 {
-                    SoftExperienceCap.xpBonusUnstaffed = BonusMultiplier * SoftExperienceCap.xpBonusUnstaffedBase;
+                    SoftExperienceCap.xpBonusUnderstaffed = BonusMultiplier * SoftExperienceCap.xpBonusUnderstaffed;
                 }
+                else
+                {
+                    SoftExperienceCap.xpBonusUnderstaffed = 0;
+                }
+                */
 
             }
             catch (Exception e)
@@ -201,7 +219,7 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInPilotData")]
     public static class AAR_UnitStatusWidget_FillInPilotData_Patch
     {
-        public static void Prefix(AAR_UnitStatusWidget __instance, ref int xpEarned, SimGameState ___simState, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SGBarracksRosterSlot ___PilotWidget)
+        public static void Prefix(AAR_UnitStatusWidget __instance, ref int xpEarned, SimGameState ___simState, Contract ___contract, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SGBarracksRosterSlot ___PilotWidget)
         {
             try
             {
@@ -213,7 +231,7 @@ namespace SoftExperienceCap
                 Color red = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.red;
                 Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
                 Color green = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.green;
-                string htmlColorTag = "";
+                string xpCapInfoColorTag = "";
 
                 int xpMinimum = SoftExperienceCap.Settings.xpMissionMinimum; // Just for the thrill of it
                 int xpHardLimit = 114000; // All skills at 10
@@ -237,53 +255,121 @@ namespace SoftExperienceCap
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PotentialExperiencePostMission: " + PotentialExperiencePostMission);
 
 
+                int xpOriginal = xpEarned;
+                int xpTemp = 0;
 
-                int xpTemp = xpEarned;
 
+
+                int xpMission = 0;
                 // Absolutely no XP when at games hard limit?
                 if (PreMissionAbsoluteExperience >= xpHardLimit)
                 {
-                    xpTemp = 0;
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
+                    xpMission = 0;
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was at BTGs absolute maximum. Gaining no XP for the mission.");
                 }
                 // Only minimum XP if already at XPCap before mission
                 else if (PreMissionAbsoluteExperience >= xpSoftCap)
                 {
-                    xpTemp = xpMinimum;
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
+                    xpMission = xpMinimum;
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was already above cap. Gaining only minimum XP for the mission.");
                 }
                 // Not more than XPCap + minimum XP
                 else if (PreMissionAbsoluteExperience < xpSoftCap && PotentialExperiencePostMission >= xpSoftCap)
                 {
-                    xpTemp = (PotentialExperiencePostMission - xpSoftCap) + xpMinimum;
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
+                    xpMission = (PotentialExperiencePostMission - xpSoftCap) + xpMinimum;
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP for the mission.");
                 }
                 // Normal XP
                 else
                 {
-                    htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
+                    xpMission = xpOriginal;
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is below cap. Gaining normal XP for the mission.");
                 }
+                xpTemp += xpMission;
+
+
 
                 // Always get XP for kills
+                int xpBonusFromKills = 0;
                 for (int i = 0; i < p.MechsKilled; i++)
                 {
-                    xpTemp += SoftExperienceCap.Settings.xpMissionMechKilled;
+                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionMechKilled;
                 }
                 for (int j = 0; j < p.OthersKilled; j++)
                 {
-                    xpTemp += SoftExperienceCap.Settings.xpMissionOtherKilled;
+                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionOtherKilled;
                 }
+                xpTemp += xpBonusFromKills;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") xpBonusFromKills: " + xpBonusFromKills);
+
+
 
                 // Bonus XP for being understaffed?
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") SoftExperienceCap.xpBonusUnstaffed: " + SoftExperienceCap.xpBonusUnstaffed);
+                int xpBonusUnderstaffed = 0;
+                int playerUnitCount = ___contract.PlayerUnitResults.Count;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] playerUnitCount: " + playerUnitCount);
+                switch (playerUnitCount)
+                {
+                    case 3:
+                        xpBonusUnderstaffed = 200;
+                        break;
+                    case 2:
+                        xpBonusUnderstaffed = 400;
+                        break;
+                    case 1:
+                        xpBonusUnderstaffed = 1200;
+                        break;
+                    default:
+                        xpBonusUnderstaffed = 0;
+                        break;
+                }
+                xpTemp += xpBonusUnderstaffed;
+
+
+
+                // Bonus XP for lance being underweight?
+                // @ToDo: Handle this as a general modifier, which can also substract XP from mission XP? -> Overweight player lances get less XP?
+                int xpBonusUnderweight = 0;
+                int contractDifficulty = ___contract.Difficulty;
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
+                float combinedTonnage = 0f;
+                int lanceTonnageRating = 0;
+                List<UnitResult> playerUnitResults = ___contract.PlayerUnitResults;
+                foreach (UnitResult unitResult in playerUnitResults)
+                {
+                    combinedTonnage += unitResult.mech.Chassis.Tonnage;
+                }
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] combinedTonnage: " + combinedTonnage);
+                for (int i = 0;  i < ___simState.Constants.MechLab.LanceDropTonnageBrackets.Length; i++)
+                {
+                    if (combinedTonnage >= (float)___simState.Constants.MechLab.LanceDropTonnageBrackets[i])
+                    {
+                        lanceTonnageRating = i + 1;
+                    }
+                }
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] lanceTonnageRating: " + lanceTonnageRating);
+                if (lanceTonnageRating < contractDifficulty)
+                {
+                    xpBonusUnderweight = (contractDifficulty - lanceTonnageRating) * 100;
+                }
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpBonusUnderweight: " + xpBonusUnderweight);
+                xpTemp += xpBonusUnderweight;
+
+
+
+                // Bonus XP for getting through mission undamaged?
+                int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : 100;
+                xpTemp += xpBonusUndamaged;
+
+
 
                 // Adjust unspent experience 
                 int AdjustedUnspentXP = PreMissionUnspentXP + xpTemp;
@@ -301,7 +387,7 @@ namespace SoftExperienceCap
                 callsign.fontSize = callsign.fontSize + 1;
                 callsign.OverflowMode = TextOverflowModes.Overflow;
 
-                callsign.SetText("{0} " + htmlColorTag + "({1} / {2}XP)</color>", new object[]
+                callsign.SetText("{0} " + xpCapInfoColorTag + "({1} / {2}XP)</color>", new object[]
                 {
                     p.Callsign,
                     //PotentialExperiencePostMission,
@@ -309,25 +395,130 @@ namespace SoftExperienceCap
                     xpSoftCap
                 });
 
+                // Generate tooltip for details on gained XP
+                string Name = p.Callsign + " gained <color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">" + xpEarned + "XP</color>";
+                string Details = "";
+                
+                if (xpMission > 0)
+                {
+                    Details += "<b>MISSION:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpMission + "XP</color></b>\n\n";
+                    Details += "This pilot is not yet fully trained and can still utilize mission experience thanks to current state of the Argo Training Modules.";
+                }
+                else
+                {
+                    Details += "<b>MISSION: +" + xpMission + "XP</b>\n\n";
+                    Details += "This pilot has exhausted the Argos current training potential and cannot utilize experience from standard mission procedures anymore.";
+                }
+                Details += "\n\n";
+
+                if (xpBonusFromKills > 0)
+                {
+                    Details += "<b>KILLS:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusFromKills + "XP</color></b>\n\n";
+                    Details += "This pilot has successfully destroyed " + (p.MechsKilled + p.OthersKilled) + " hostile units on the battlefield.";
+                }
+                else
+                {
+                    Details += "<b>KILLS: +" + xpBonusFromKills + "XP</b>\n\n";
+                    Details += "This pilot didn't destroy any hostile units on the battlefield.";
+                }
+                Details += "\n\n";
+
+                if (xpBonusUnderstaffed > 0)
+                {
+                    Details += "<b>UNDERSTAFFED:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusUnderstaffed + "XP</color></b>\n\n";
+                    Details += "This pilot had to contribute extraordinarily to the mission outcome as part of an incomplete lance.";
+                }
+                else
+                {
+                    Details += "<b>UNDERSTAFFED: +" + xpBonusUnderstaffed + "XP</b>\n\n";
+                    Details += "This pilot was deployed as part of a full lance and contributed normally to the outcome of the mission.";
+                }
+                Details += "\n\n";
+
+                if (xpBonusUnderweight > 0)
+                {
+                    Details += "<b>UNDERWEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusUnderweight + "XP</color></b>\n\n";
+                    Details += "This pilots lance had to cope with the extra stress of facing overwhelming enemy forces.";
+                }
+                else
+                {
+                    Details += "<b>UNDERWEIGHT: +" + xpBonusUnderweight + "XP</b>\n\n";
+                    Details += "This pilots lance was appropriately sized for the encountered enemy forces.";
+                }
+                Details += "\n\n";
+
+                if (xpBonusUndamaged > 0)
+                {
+                    Details += "<b>UNDAMAGED:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusUndamaged + "XP</color></b>\n\n";
+                    Details += "This pilots 'Mech remained undamaged over the course of the mission.";
+                }
+                else
+                {
+                    Details += "<b>UNDAMAGED: +" + xpBonusUndamaged + "XP</b>\n\n";
+                    Details += "This pilots 'Mech suffered structural damage over the course of the mission.";
+                }
+
+                GameObject XPTextGameObject = ___XPText.gameObject;
+                HBSTooltip Tooltip = XPTextGameObject.AddComponent<HBSTooltip>();
+                HBSTooltipStateData StateData = new HBSTooltipStateData();
+                BaseDescriptionDef TooltipContent = new BaseDescriptionDef("", Name, Details, "");
+
+                StateData.SetObject(TooltipContent);
+                Tooltip.SetDefaultStateData(StateData);
+
             }
             catch (Exception e)
             {
                 Logger.LogError(e);
             }
         }
-        public static void Postfix(AAR_UnitStatusWidget __instance, UnitResult ___UnitData, SimGameState ___simState)
+        public static void Postfix(AAR_UnitStatusWidget __instance, int xpEarned, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SimGameState ___simState)
         {
             try
             {
+                /*
                 Pilot p = ___UnitData.pilot;
-                PilotDef pDef = p.pilotDef;
+                int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : 100;
+                int xpBonusFromKills = 0;
+                for (int i = 0; i < p.MechsKilled; i++)
+                {
+                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionMechKilled;
+                }
+                for (int j = 0; j < p.OthersKilled; j++)
+                {
+                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionOtherKilled;
+                }
+                int xpFromMission = xpEarned - xpBonusFromKills - SoftExperienceCap.xpBonusUnderstaffed;
 
-                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                int UnspentXP = p.UnspentXP;
-                int AbsoluteExperience = AbsoluteExperienceSpent + UnspentXP;
 
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] CHECK (" + p.Name + ") UnspentXP: " + p.UnspentXP);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_POSTFIX] CHECK (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
+                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
+                string htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
+                string Name = htmlColorTag + p.Callsign + " gained " + xpEarned + "XP</color>";
+                string Details = "";
+                Details += "+ " + xpFromMission + "XP for general mission performance";
+                Details += "\n";
+                Details += "+ " + xpBonusFromKills + "XP for killing enemy units";
+                Details += "\n";
+                Details += "+ " + SoftExperienceCap.xpBonusUnderstaffed + "XP for completing the mission understaffed";
+
+                GameObject XPTextGameObject = ___XPText.gameObject;
+                HBSTooltip Tooltip = XPTextGameObject.AddComponent<HBSTooltip>();
+                HBSTooltipStateData StateData = new HBSTooltipStateData();
+                BaseDescriptionDef TooltipContent = new BaseDescriptionDef("", Name, Details, "");
+
+                StateData.SetObject(TooltipContent);
+                Tooltip.SetDefaultStateData(StateData);
+                */
+
+
+                /*
+                ___XPText.SetText("+{0}XP ({1}XP from Kills, {2}XP from being understaffed)", new object[]
+                {
+                    xpEarned,
+                    xpBonusFromKills,
+                    SoftExperienceCap.xpBonusUnderstaffed
+                });
+                */
             }
             catch (Exception e)
             {
