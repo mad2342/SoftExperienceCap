@@ -9,6 +9,9 @@ using UnityEngine;
 using HBS;
 using System.Collections.Generic;
 using BattleTech.UI.Tooltips;
+using System.IO;
+
+
 
 namespace SoftExperienceCap
 {
@@ -19,11 +22,6 @@ namespace SoftExperienceCap
 
         // BEN: Debug (0: nothing, 1: errors, 2:all)
         internal static int DebugLevel = 2;
-
-        internal static int xpBonusUnderstaffed = 0;
-        internal static int xpBonusUnderstaffedBase = 200;
-        internal static int xpBonusUnderweight = 0;
-        internal static int xpBonusUnderweightPerTon = 10;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
@@ -36,6 +34,9 @@ namespace SoftExperienceCap
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             ModDirectory = directory;
+            // Empty log at startup
+            File.CreateText($"{SoftExperienceCap.ModDirectory}/SoftExperienceCap.log");
+
             try
             {
                 Settings = JsonConvert.DeserializeObject<Settings>(settings);
@@ -142,13 +143,12 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(Contract), "CompleteContract")]
     public static class Contract_CompleteContract_Patch
     {
-        public static void Postfix(Contract __instance, MissionResult result, bool isGoodFaithEffort)
+        public static void Postfix(Contract __instance)
         {
             try
             {
                 // Same for ALL pilots
-                int ExperienceEarned = (int)AccessTools.Property(typeof(Contract), "ExperienceEarned").GetValue(__instance, null);
-                Logger.LogLine("[Contract_CompleteContract_POSTFIX] ExperienceEarned: " + ExperienceEarned);
+                Logger.LogLine("[Contract_CompleteContract_POSTFIX] ExperienceEarned: " + __instance.ExperienceEarned);
             }
             catch (Exception e)
             {
@@ -157,7 +157,7 @@ namespace SoftExperienceCap
         }
     }
 
-
+    /*
     [HarmonyPatch(typeof(AAR_UnitsResult_Screen), "FillInData")]
     public static class AAR_UnitsResult_Screen_FillInData_Patch
     {
@@ -165,46 +165,6 @@ namespace SoftExperienceCap
         {
             try
             {
-                /*
-                int ExperienceEarned = ___theContract.ExperienceEarned;
-                Logger.LogLine("[AAR_UnitsResult_Screen_FillInData_PREFIX] ExperienceEarned: " + ExperienceEarned);
-                int ContractDifficulty = ___theContract.Difficulty;
-                Logger.LogLine("[AAR_UnitsResult_Screen_FillInData_PREFIX] ContractDifficulty: " + ContractDifficulty);
-
-                int UnstaffedUnits = 0;
-                int BonusMultiplier = 1;
-
-                float CombinedTonnage = 0f;
-                foreach (UnitResult unitResult in ___UnitResults)
-                {
-                    CombinedTonnage += unitResult.mech.Chassis.Tonnage;
-                }
-                // @ToDo: Compare ContractDifficulty with calculated difficulty from CombinedTonnage -> Store bonus XP
-
-
-                // @ToDo: Use ___numUnits and explicitely set bonus for understaffed with switch 1-4
-                for (int i = 0; i < 4; i++)
-                {
-                    if (___UnitWidgets[i] == null)
-                    {
-                        UnstaffedUnits++;
-                        BonusMultiplier = BonusMultiplier * UnstaffedUnits;
-                    }
-                }
-
-                //TEST
-                //int UnstaffedUnits = 2;
-                //int BonusMultiplier = 2;
-
-                if (UnstaffedUnits > 0)
-                {
-                    SoftExperienceCap.xpBonusUnderstaffed = BonusMultiplier * SoftExperienceCap.xpBonusUnderstaffed;
-                }
-                else
-                {
-                    SoftExperienceCap.xpBonusUnderstaffed = 0;
-                }
-                */
 
             }
             catch (Exception e)
@@ -213,8 +173,7 @@ namespace SoftExperienceCap
             }
         }
     }
-
-
+    */
 
     [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInPilotData")]
     public static class AAR_UnitStatusWidget_FillInPilotData_Patch
@@ -273,7 +232,7 @@ namespace SoftExperienceCap
                 else if (PreMissionAbsoluteExperience >= xpSoftCap)
                 {
                     xpMission = xpMinimum;
-                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was already above cap. Gaining only minimum XP for the mission.");
                 }
@@ -466,59 +425,6 @@ namespace SoftExperienceCap
                 StateData.SetObject(TooltipContent);
                 Tooltip.SetDefaultStateData(StateData);
 
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-            }
-        }
-        public static void Postfix(AAR_UnitStatusWidget __instance, int xpEarned, UnitResult ___UnitData, TextMeshProUGUI ___XPText, SimGameState ___simState)
-        {
-            try
-            {
-                /*
-                Pilot p = ___UnitData.pilot;
-                int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : 100;
-                int xpBonusFromKills = 0;
-                for (int i = 0; i < p.MechsKilled; i++)
-                {
-                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionMechKilled;
-                }
-                for (int j = 0; j < p.OthersKilled; j++)
-                {
-                    xpBonusFromKills += SoftExperienceCap.Settings.xpMissionOtherKilled;
-                }
-                int xpFromMission = xpEarned - xpBonusFromKills - SoftExperienceCap.xpBonusUnderstaffed;
-
-
-                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
-                string htmlColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
-                string Name = htmlColorTag + p.Callsign + " gained " + xpEarned + "XP</color>";
-                string Details = "";
-                Details += "+ " + xpFromMission + "XP for general mission performance";
-                Details += "\n";
-                Details += "+ " + xpBonusFromKills + "XP for killing enemy units";
-                Details += "\n";
-                Details += "+ " + SoftExperienceCap.xpBonusUnderstaffed + "XP for completing the mission understaffed";
-
-                GameObject XPTextGameObject = ___XPText.gameObject;
-                HBSTooltip Tooltip = XPTextGameObject.AddComponent<HBSTooltip>();
-                HBSTooltipStateData StateData = new HBSTooltipStateData();
-                BaseDescriptionDef TooltipContent = new BaseDescriptionDef("", Name, Details, "");
-
-                StateData.SetObject(TooltipContent);
-                Tooltip.SetDefaultStateData(StateData);
-                */
-
-
-                /*
-                ___XPText.SetText("+{0}XP ({1}XP from Kills, {2}XP from being understaffed)", new object[]
-                {
-                    xpEarned,
-                    xpBonusFromKills,
-                    SoftExperienceCap.xpBonusUnderstaffed
-                });
-                */
             }
             catch (Exception e)
             {
