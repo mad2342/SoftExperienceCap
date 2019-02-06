@@ -21,7 +21,7 @@ namespace SoftExperienceCap
         internal static Settings Settings;
 
         // BEN: Debug (0: nothing, 1: errors, 2:all)
-        internal static int DebugLevel = 2;
+        internal static int DebugLevel = 1;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
@@ -34,7 +34,6 @@ namespace SoftExperienceCap
             harmony.PatchAll(Assembly.GetExecutingAssembly());
 
             ModDirectory = directory;
-            // Empty log at startup
             File.CreateText($"{SoftExperienceCap.ModDirectory}/SoftExperienceCap.log");
 
             try
@@ -127,6 +126,70 @@ namespace SoftExperienceCap
 
                 int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
                 Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e);
+            }
+        }
+    }
+
+    [HarmonyPatch(typeof(SGBarracksDossierPanel), "SetPilot")]
+    public static class SGBarracksDossierPanel_SetPilot_Patch
+    {
+        public static void Postfix(SGBarracksDossierPanel __instance, Pilot p, TextMeshProUGUI ___callsign)
+        {
+            try
+            {
+                SimGameState simGameState = UnityGameInstance.BattleTechGame.Simulation;
+                PilotDef pDef = p.pilotDef;
+                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, simGameState);
+                int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
+                int xpSoftCap = simGameState.GetCurrentExperienceCap();
+
+                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
+                Color green = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.green;
+                string xpCapInfoColorTag = "";
+
+                if (AbsoluteExperience >= xpSoftCap)
+                {
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
+                }
+                else
+                {
+                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
+                }
+
+                //___callsign.enableAutoSizing = false;
+                //___callsign.enableWordWrapping = false;
+                //___callsign.OverflowMode = TextOverflowModes.Overflow;
+
+                ___callsign.SetText("{0} (" + xpCapInfoColorTag + "{1}</color> XP)", new object[]
+                {
+                    p.Callsign,
+                    AbsoluteExperience
+                });
+
+                //___callsign.SetText("{0} (" + xpCapInfoColorTag + "{1}</color>/{2}<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">XP</color>)", new object[]
+                //{
+                //    p.Callsign,
+                //    AbsoluteExperience,
+                //    xpSoftCap
+                //});
+
+                /*
+                string Name = p.Callsign + " has " + xpCapInfoColorTag + AbsoluteExperience + "</color> / " + xpSoftCap + "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> XP</color>";
+                string Details = "Test blabla";
+
+                ___callsign.LinksEnabled = true;
+                GameObject callsignGameObject = ___callsign.gameObject;
+                HBSTooltip callsignTooltip = callsignGameObject.AddComponent<HBSTooltip>();
+                HBSTooltipStateData callsignStateData = new HBSTooltipStateData();
+                BaseDescriptionDef callsignTooltipContent = new BaseDescriptionDef("SEC_callsignTooltipContent", Name, Details, "");
+
+                callsignStateData.SetObject(callsignTooltipContent);
+                callsignTooltip.SetDefaultStateData(callsignStateData);
+                */
             }
             catch (Exception e)
             {
@@ -256,7 +319,7 @@ namespace SoftExperienceCap
 
 
 
-                // Always get XP for kills
+                // Bonus XP for kills
                 int xpBonusFromKills = 0;
                 for (int i = 0; i < p.MechsKilled; i++)
                 {
@@ -294,9 +357,14 @@ namespace SoftExperienceCap
 
 
 
-                // Bonus XP for lance being underweight?
-                // @ToDo: Handle this as a general modifier, which can also substract XP from mission XP? -> Overweight player lances get less XP?
-                int xpBonusUnderweight = 0;
+                // Bonus XP for getting through mission undamaged?
+                int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : 100;
+                xpTemp += xpBonusUndamaged;
+
+
+
+                // Modify XP depending on lance weight?
+                int xpModifierLanceWeight = 0;
                 int contractDifficulty = ___contract.Difficulty;
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
                 float combinedTonnage = 0f;
@@ -307,7 +375,7 @@ namespace SoftExperienceCap
                     combinedTonnage += unitResult.mech.Chassis.Tonnage;
                 }
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] combinedTonnage: " + combinedTonnage);
-                for (int i = 0;  i < ___simState.Constants.MechLab.LanceDropTonnageBrackets.Length; i++)
+                for (int i = 0; i < ___simState.Constants.MechLab.LanceDropTonnageBrackets.Length; i++)
                 {
                     if (combinedTonnage >= (float)___simState.Constants.MechLab.LanceDropTonnageBrackets[i])
                     {
@@ -315,18 +383,20 @@ namespace SoftExperienceCap
                     }
                 }
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] lanceTonnageRating: " + lanceTonnageRating);
-                if (lanceTonnageRating < contractDifficulty)
+                //if (lanceTonnageRating < contractDifficulty)
+                //{
+                    xpModifierLanceWeight = (contractDifficulty - lanceTonnageRating) * 100;
+                //}
+                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpModifierLanceWeight: " + xpModifierLanceWeight);
+                xpTemp += xpModifierLanceWeight;
+
+
+
+                // Sanitize
+                if (xpTemp < 0)
                 {
-                    xpBonusUnderweight = (contractDifficulty - lanceTonnageRating) * 100;
+                    xpTemp = 0;
                 }
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpBonusUnderweight: " + xpBonusUnderweight);
-                xpTemp += xpBonusUnderweight;
-
-
-
-                // Bonus XP for getting through mission undamaged?
-                int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : 100;
-                xpTemp += xpBonusUndamaged;
 
 
 
@@ -346,7 +416,7 @@ namespace SoftExperienceCap
                 callsign.fontSize = callsign.fontSize + 1;
                 callsign.OverflowMode = TextOverflowModes.Overflow;
 
-                callsign.SetText("{0} " + xpCapInfoColorTag + "({1} / {2}XP)</color>", new object[]
+                callsign.SetText("{0} (" + xpCapInfoColorTag + "{1}</color> / {2}XP)", new object[]
                 {
                     p.Callsign,
                     //PotentialExperiencePostMission,
@@ -365,7 +435,7 @@ namespace SoftExperienceCap
                 }
                 else
                 {
-                    Details += "<b>MISSION: +" + xpMission + "XP</b>\n\n";
+                    Details += "<b>MISSION: " + xpMission + "XP</b>\n\n";
                     Details += "This pilot has exhausted the Argos current training potential and cannot utilize experience from standard mission procedures anymore.";
                 }
                 Details += "\n\n";
@@ -377,7 +447,7 @@ namespace SoftExperienceCap
                 }
                 else
                 {
-                    Details += "<b>KILLS: +" + xpBonusFromKills + "XP</b>\n\n";
+                    Details += "<b>KILLS: " + xpBonusFromKills + "XP</b>\n\n";
                     Details += "This pilot didn't destroy any hostile units on the battlefield.";
                 }
                 Details += "\n\n";
@@ -389,20 +459,8 @@ namespace SoftExperienceCap
                 }
                 else
                 {
-                    Details += "<b>UNDERSTAFFED: +" + xpBonusUnderstaffed + "XP</b>\n\n";
+                    Details += "<b>UNDERSTAFFED: " + xpBonusUnderstaffed + "XP</b>\n\n";
                     Details += "This pilot was deployed as part of a full lance and contributed normally to the outcome of the mission.";
-                }
-                Details += "\n\n";
-
-                if (xpBonusUnderweight > 0)
-                {
-                    Details += "<b>UNDERWEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusUnderweight + "XP</color></b>\n\n";
-                    Details += "This pilots lance had to cope with the extra stress of facing overwhelming enemy forces.";
-                }
-                else
-                {
-                    Details += "<b>UNDERWEIGHT: +" + xpBonusUnderweight + "XP</b>\n\n";
-                    Details += "This pilots lance was appropriately sized for the encountered enemy forces.";
                 }
                 Details += "\n\n";
 
@@ -413,9 +471,28 @@ namespace SoftExperienceCap
                 }
                 else
                 {
-                    Details += "<b>UNDAMAGED: +" + xpBonusUndamaged + "XP</b>\n\n";
+                    Details += "<b>UNDAMAGED: " + xpBonusUndamaged + "XP</b>\n\n";
                     Details += "This pilots 'Mech suffered structural damage over the course of the mission.";
                 }
+                Details += "\n\n";
+
+                if (xpModifierLanceWeight > 0)
+                {
+                    Details += "<b>LANCE WEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpModifierLanceWeight + "XP</color></b>\n\n";
+                    Details += "This pilots lance had to cope with the extra stress of facing overwhelming enemy forces.";
+                }
+                else if (xpModifierLanceWeight < 0)
+                {
+                    Details += "<b>LANCE WEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(red) + "> " + xpModifierLanceWeight + "XP</color></b>\n\n";
+                    Details += "This pilots lance outmatched the enemy forces resulting in less valuable combat experience.";
+                }
+                else
+                {
+                    Details += "<b>LANCE WEIGHT: " + xpModifierLanceWeight + "XP</b>\n\n";
+                    Details += "This pilots lance was appropriately sized for the encountered enemy forces.";
+                }
+
+                
 
                 GameObject XPTextGameObject = ___XPText.gameObject;
                 HBSTooltip Tooltip = XPTextGameObject.AddComponent<HBSTooltip>();

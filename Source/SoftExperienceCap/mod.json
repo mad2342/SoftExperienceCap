@@ -2,8 +2,8 @@
     "Name": "SoftExperienceCap",
     "Enabled": true,
 
-    "Version": "1.3.2-001R",
-    "Description": "Mission experience only gets rewarded up to a certain limit which is expandable with the right Argo Upgrades.",
+    "Version": "1.3.2-002R",
+    "Description": "Mission experience only gets rewarded up to a certain limit which is expandable with the right Argo Upgrades. An optional pilot respec with the chosen XP Cap is included. Some possibilities to gain additional XP exist.",
     "Author": "Mad",
 	
 	"DLL": "SoftExperienceCap.dll",
