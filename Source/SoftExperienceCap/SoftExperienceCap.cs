@@ -62,9 +62,12 @@ namespace SoftExperienceCap
         public static void Postfix(SimGameState __instance)
 
         {
-            if (__instance.ApplyExperienceCap())
+            if (__instance.CompletedContract != null)
             {
-                __instance.ResetExperienceForAllPilots();
+                if (__instance.ApplyExperienceCap())
+                {
+                    __instance.ResetExperienceForAllPilots();
+                }
             }
         }
     }
