@@ -363,6 +363,7 @@ namespace SoftExperienceCap
 
                 // Mission XP
                 int xpMission = 0;
+
                 // Absolutely no XP when at games hard limit?
                 if (PreMissionAbsoluteExperience >= xpHardLimit)
                 {
