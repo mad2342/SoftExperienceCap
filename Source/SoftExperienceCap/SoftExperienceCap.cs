@@ -452,8 +452,11 @@ namespace SoftExperienceCap
                 // Modify XP depending on lance weight?
                 int xpModifierLanceWeightBase = (int)(100 * xpBonusModifier);
                 int xpModifierLanceWeight = 0;
+
+                //@ToDo: Check _finalDifficulty from ContractOverride?
                 int contractDifficulty = ___contract.Difficulty;
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
+
                 float combinedTonnage = 0f;
                 int lanceTonnageRating = 0;
                 List<UnitResult> playerUnitResults = ___contract.PlayerUnitResults;
