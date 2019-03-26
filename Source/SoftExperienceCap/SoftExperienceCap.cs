@@ -383,7 +383,7 @@ namespace SoftExperienceCap
                 // Not more than XPCap + minimum XP
                 else if (PreMissionAbsoluteExperience < xpSoftCap && PotentialExperiencePostMission >= xpSoftCap)
                 {
-                    xpMission = (PotentialExperiencePostMission - xpSoftCap) + xpMinimum;
+                    xpMission = (xpSoftCap - PreMissionAbsoluteExperience) + xpMinimum;
                     xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
 
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP for the mission.");
