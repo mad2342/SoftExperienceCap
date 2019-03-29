@@ -11,8 +11,6 @@ using System.Collections.Generic;
 using BattleTech.UI.Tooltips;
 using System.IO;
 
-
-
 namespace SoftExperienceCap
 {
     public class SoftExperienceCap
@@ -137,71 +135,6 @@ namespace SoftExperienceCap
         }
     }
 
-    // Display XP next to pilots callsign
-    [HarmonyPatch(typeof(SGBarracksDossierPanel), "SetPilot")]
-    public static class SGBarracksDossierPanel_SetPilot_Patch
-    {
-        public static void Postfix(SGBarracksDossierPanel __instance, Pilot p, TextMeshProUGUI ___callsign)
-        {
-            try
-            {
-                SimGameState simGameState = UnityGameInstance.BattleTechGame.Simulation;
-                PilotDef pDef = p.pilotDef;
-                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, simGameState);
-                int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
-                int xpSoftCap = simGameState.GetCurrentExperienceCap();
-
-                Color gold = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.gold;
-                Color green = LazySingletonBehavior<UIManager>.Instance.UIColorRefs.green;
-                string xpCapInfoColorTag = "";
-
-                if (AbsoluteExperience >= xpSoftCap)
-                {
-                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
-                }
-                else
-                {
-                    xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
-                }
-
-                //___callsign.enableAutoSizing = false;
-                //___callsign.enableWordWrapping = false;
-                //___callsign.OverflowMode = TextOverflowModes.Overflow;
-
-                ___callsign.SetText("{0} (" + xpCapInfoColorTag + "{1}</color> XP)", new object[]
-                {
-                    p.Callsign,
-                    AbsoluteExperience
-                });
-
-                //___callsign.SetText("{0} (" + xpCapInfoColorTag + "{1}</color>/{2}<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">XP</color>)", new object[]
-                //{
-                //    p.Callsign,
-                //    AbsoluteExperience,
-                //    xpSoftCap
-                //});
-
-                /* No joy
-                string Name = p.Callsign + " has " + xpCapInfoColorTag + AbsoluteExperience + "</color> / " + xpSoftCap + "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> XP</color>";
-                string Details = "Test";
-
-                ___callsign.LinksEnabled = true;
-                GameObject callsignGameObject = ___callsign.gameObject;
-                HBSTooltip callsignTooltip = callsignGameObject.AddComponent<HBSTooltip>();
-                HBSTooltipStateData callsignStateData = new HBSTooltipStateData();
-                BaseDescriptionDef callsignTooltipContent = new BaseDescriptionDef("SEC_callsignTooltipContent", Name, Details, "");
-
-                callsignStateData.SetObject(callsignTooltipContent);
-                callsignTooltip.SetDefaultStateData(callsignStateData);
-                */
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-            }
-        }
-    }
-
     /*
      * BEN: This is the real shit.
      * For now i'm patching into this ONLY to check that my data injection via UI-Patches actually get called AFTER this...
@@ -276,25 +209,6 @@ namespace SoftExperienceCap
 
 
 
-
-    /*
-    [HarmonyPatch(typeof(AAR_UnitsResult_Screen), "FillInData")]
-    public static class AAR_UnitsResult_Screen_FillInData_Patch
-    {
-        public static void Prefix(AAR_UnitsResult_Screen __instance, List<AAR_UnitStatusWidget> ___UnitWidgets, List<UnitResult> ___UnitResults, int ___numUnits, Contract ___theContract)
-        {
-            try
-            {
-
-            }
-            catch (Exception e)
-            {
-                Logger.LogError(e);
-            }
-        }
-    }
-    */
-
     [HarmonyPatch(typeof(AAR_UnitStatusWidget), "FillInPilotData")]
     public static class AAR_UnitStatusWidget_FillInPilotData_Patch
     {
@@ -313,20 +227,25 @@ namespace SoftExperienceCap
                 bool missionRetreatedBadFaith = state == Contract.ContractState.Retreated && !___contract.IsGoodFaithEffort;
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Withdrawed (Bad Faith): " + missionRetreatedBadFaith);
 
-                // RETURN EARLY when absolutely no XP were earned?
+                // RETURN EARLY when absolutely no XP were earned
                 if (xpEarned <= 0)
                 {
                     return;
                 }
 
+                // Determine modifier for partial mission completion via XP comparison
                 int xpPotentialMission = Mathf.FloorToInt((float)___contract.Override.finalDifficulty * ___simState.Constants.Pilot.BaseXPGainPerMission);
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpPotentialMission: " + xpPotentialMission);
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned: " + xpEarned);
-
                 double xpBonusModifier = (double)xpEarned / xpPotentialMission;
                 Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpBonusModifier: " + xpBonusModifier.ToString());
 
-
+                // Early limit if applicable
+                if (SoftExperienceCap.Settings.xpMissionMaximum > 0 && xpEarned > SoftExperienceCap.Settings.xpMissionMaximum)
+                {
+                    xpEarned = SoftExperienceCap.Settings.xpMissionMaximum;
+                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned exceeded configured maximum. Limited to: " + xpEarned);
+                }
 
                 Pilot p = ___UnitData.pilot;
                 PilotDef pDef = p.pilotDef;
@@ -531,6 +450,8 @@ namespace SoftExperienceCap
 
 
                 // Show additional info about current/maximum XP in UI
+                // This was generalized in SGBarracksRosterSlot.Refresh()
+                /*
                 TextMeshProUGUI callsign = (TextMeshProUGUI)AccessTools.Field(typeof(SGBarracksRosterSlot), "callsign").GetValue(___PilotWidget);
                 callsign.enableAutoSizing = false;
                 callsign.enableWordWrapping = false;
@@ -544,6 +465,7 @@ namespace SoftExperienceCap
                     PreMissionAbsoluteExperience,
                     xpSoftCap
                 });
+                */
 
 
 
@@ -567,7 +489,8 @@ namespace SoftExperienceCap
                 else if (missionFailed)
                 {
                     Details += "The mission <b><color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">failed</color></b>. At least the survivors can learn something from from it. The following XP modifiers apply:\n\n";
-                } else
+                }
+                else
                 {
                     Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] Unknown mission state.");
                 }
@@ -576,7 +499,7 @@ namespace SoftExperienceCap
                 if (xpMission > 0)
                 {
                     Details += "<b>MISSION:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpMission + "XP</color></b>\n\n";
-                    Details += "This pilot is not yet fully trained and can still utilize mission experience thanks to current state of the Argo Training Modules.";
+                    Details += "This pilot is not yet fully trained and can still utilize mission experience thanks to the current development stage of the Argo Training Modules.";
                 }
                 else
                 {
@@ -655,6 +578,120 @@ namespace SoftExperienceCap
 
                 StateData.SetObject(TooltipContent);
                 Tooltip.SetDefaultStateData(StateData);
+
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e);
+            }
+        }
+    }
+
+    // Display XP next to pilots callsign in Roster Slots
+    [HarmonyPatch(typeof(SGBarracksRosterSlot), "Refresh")]
+    public static class SGBarracksRosterSlot_Refresh_Patch
+    {
+        public static void Postfix(SGBarracksRosterSlot __instance, Pilot ___pilot, TextMeshProUGUI ___callsign, HBSTooltip ___TypeTooltip)
+        {
+            try
+            {
+                SimGameState simGameState = UnityGameInstance.BattleTechGame.Simulation;
+                PilotDef pDef = ___pilot.pilotDef;
+                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, simGameState);
+                int AbsoluteExperience = AbsoluteExperienceSpent + ___pilot.UnspentXP;
+                int xpSoftCap = simGameState.GetCurrentExperienceCap();
+
+                string AbsoluteExperienceString = "";
+                string xpSoftCapString = Utilities.WrapWithColor(xpSoftCap, "medGray");
+                string callsignCurrentText = ___callsign.text;
+                string xpInfo = "";
+
+                if (AbsoluteExperience >= xpSoftCap)
+                {
+                    AbsoluteExperienceString = Utilities.WrapWithColor(AbsoluteExperience, "goldHalf");
+                }
+                else
+                {
+                    AbsoluteExperienceString = Utilities.WrapWithColor(AbsoluteExperience, "greenHalf");
+                }
+
+                //___callsign.faceColor = white;
+                ___callsign.fontSize = ___callsign.fontSize + 1;
+                ___callsign.enableAutoSizing = false;
+                ___callsign.enableWordWrapping = false;
+                ___callsign.OverflowMode = TextOverflowModes.Overflow;
+ 
+                xpInfo = "("+ AbsoluteExperienceString + "/"+ xpSoftCapString + " XP)";
+                xpInfo = Utilities.WrapWithColor(xpInfo, "medGray");
+
+                ___callsign.SetText("{0}   {1}", new object[]
+                {
+                    callsignCurrentText,
+                    xpInfo
+                });
+
+                // Override Rank Tooltip
+                if (___TypeTooltip != null)
+                {
+                    BaseDescriptionDef overrideDef = Utilities.BuildRankTooltipOverrideDef(simGameState, ___pilot, AbsoluteExperience, xpSoftCap);
+                    ___TypeTooltip.SetDefaultStateData(TooltipUtilities.GetStateDataFromObject(overrideDef)); 
+                }
+
+            }
+            catch (Exception e)
+            {
+                Logger.LogError(e);
+            }
+        }
+    }
+
+    // Display XP next to pilots callsign in Dossier Panel
+    [HarmonyPatch(typeof(SGBarracksDossierPanel), "SetPilot")]
+    public static class SGBarracksDossierPanel_SetPilot_Patch
+    {
+        public static void Postfix(SGBarracksDossierPanel __instance, Pilot p, TextMeshProUGUI ___callsign, HBSTooltip ___VeteranReference)
+        {
+            try
+            {
+                SimGameState simGameState = UnityGameInstance.BattleTechGame.Simulation;
+                PilotDef pDef = p.pilotDef;
+                int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, simGameState);
+                int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
+                int xpSoftCap = simGameState.GetCurrentExperienceCap();
+
+                string AbsoluteExperienceString = "";
+                string xpSoftCapString = Utilities.WrapWithColor(xpSoftCap, "medGray");
+                string callsignCurrentText = ___callsign.text;
+                string xpInfo = "";
+
+                if (AbsoluteExperience >= xpSoftCap)
+                {
+                    AbsoluteExperienceString = Utilities.WrapWithColor(AbsoluteExperience, "gold");
+                }
+                else
+                {
+                    AbsoluteExperienceString = Utilities.WrapWithColor(AbsoluteExperience, "green");
+                }
+
+                //___callsign.enableAutoSizing = false;
+                //___callsign.enableWordWrapping = false;
+                //___callsign.OverflowMode = TextOverflowModes.Overflow;
+
+                xpInfo = "(" + AbsoluteExperienceString + "/" + xpSoftCapString + " XP)";
+                xpInfo = Utilities.WrapWithColor(xpInfo, "medGray");
+
+                ___callsign.SetText("{0}   <size=15>{1}</size>", new object[]
+                {
+                    callsignCurrentText,
+                    xpInfo
+                });
+
+                // Override Rank Tooltip
+                if (___VeteranReference != null)
+                {
+                    BaseDescriptionDef overrideDef = Utilities.BuildRankTooltipOverrideDef(simGameState, p, AbsoluteExperience, xpSoftCap);
+                    ___VeteranReference.SetDefaultStateData(TooltipUtilities.GetStateDataFromObject(overrideDef));
+                }
 
             }
             catch (Exception e)

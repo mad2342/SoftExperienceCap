@@ -16,6 +16,7 @@
 			60000
 		],
         "xpMissionMinimum": 0,
+        "xpMissionMaximum": 4000,
         "xpMissionMechKilled": 100,
         "xpMissionOtherKilled": 50,
 
