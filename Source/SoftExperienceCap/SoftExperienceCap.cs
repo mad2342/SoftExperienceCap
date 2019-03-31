@@ -62,10 +62,12 @@ namespace SoftExperienceCap
         {
             if (__instance.CompletedContract != null)
             {
-                if (__instance.ApplyExperienceCap())
-                {
-                    __instance.ResetExperienceForAllPilots();
-                }
+                return;
+            }
+
+            if (__instance.ApplyExperienceCap())
+            {
+                __instance.ResetExperienceForAllPilots();
             }
         }
     }
@@ -616,7 +618,6 @@ namespace SoftExperienceCap
                 }
 
                 //___callsign.faceColor = white;
-                ___callsign.fontSize = ___callsign.fontSize + 1;
                 ___callsign.enableAutoSizing = false;
                 ___callsign.enableWordWrapping = false;
                 ___callsign.OverflowMode = TextOverflowModes.Overflow;
