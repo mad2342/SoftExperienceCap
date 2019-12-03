@@ -10,6 +10,7 @@ using HBS;
 using System.Collections.Generic;
 using BattleTech.UI.Tooltips;
 using System.IO;
+using BattleTech.UI.TMProWrapper;
 
 namespace SoftExperienceCap
 {
@@ -593,7 +594,7 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(SGBarracksRosterSlot), "Refresh")]
     public static class SGBarracksRosterSlot_Refresh_Patch
     {
-        public static void Postfix(SGBarracksRosterSlot __instance, Pilot ___pilot, TextMeshProUGUI ___callsign, HBSTooltip ___TypeTooltip)
+        public static void Postfix(SGBarracksRosterSlot __instance, Pilot ___pilot, LocalizableText ___callsign, HBSTooltip ___TypeTooltip)
         {
             try
             {
@@ -620,7 +621,7 @@ namespace SoftExperienceCap
                 //___callsign.faceColor = white;
                 ___callsign.enableAutoSizing = false;
                 ___callsign.enableWordWrapping = false;
-                ___callsign.OverflowMode = TextOverflowModes.Overflow;
+                ___callsign.overflowMode = TextOverflowModes.Overflow;
  
                 xpInfo = "("+ AbsoluteExperienceString + "/"+ xpSoftCapString + " XP)";
                 xpInfo = Utilities.WrapWithColor(xpInfo, "medGray");
@@ -650,7 +651,7 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(SGBarracksDossierPanel), "SetPilot")]
     public static class SGBarracksDossierPanel_SetPilot_Patch
     {
-        public static void Postfix(SGBarracksDossierPanel __instance, Pilot p, TextMeshProUGUI ___callsign, HBSTooltip ___VeteranReference)
+        public static void Postfix(SGBarracksDossierPanel __instance, Pilot p, LocalizableText ___callsign, HBSTooltip ___VeteranReference)
         {
             try
             {

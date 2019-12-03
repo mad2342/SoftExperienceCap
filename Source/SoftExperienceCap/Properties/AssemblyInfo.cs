@@ -6,4 +6,4 @@ using System.Runtime.InteropServices;
 [assembly: AssemblyProduct("SoftExperienceCap")]
 [assembly: ComVisible(false)]
 [assembly: Guid("9BC8121F-EBE8-42F8-999E-34F7A3E2B528")]
-[assembly: AssemblyVersion("1.5.0.*")]
+[assembly: AssemblyVersion("1.8.0.*")]
