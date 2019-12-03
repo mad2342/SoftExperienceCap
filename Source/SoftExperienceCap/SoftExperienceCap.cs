@@ -594,15 +594,24 @@ namespace SoftExperienceCap
     [HarmonyPatch(typeof(SGBarracksRosterSlot), "Refresh")]
     public static class SGBarracksRosterSlot_Refresh_Patch
     {
-        public static void Postfix(SGBarracksRosterSlot __instance, Pilot ___pilot, LocalizableText ___callsign, HBSTooltip ___TypeTooltip)
+        public static void Postfix(SGBarracksRosterSlot __instance, SimGameState ___simState, bool ___showCost, Pilot ___pilot, LocalizableText ___callsign, HBSTooltip ___TypeTooltip)
         {
             try
             {
+                // Disable for Hiring Halls?
+                if (___showCost && ___simState != null)
+                {
+                    return;
+                }
+
                 SimGameState simGameState = UnityGameInstance.BattleTechGame.Simulation;
                 PilotDef pDef = ___pilot.pilotDef;
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, simGameState);
                 int AbsoluteExperience = AbsoluteExperienceSpent + ___pilot.UnspentXP;
                 int xpSoftCap = simGameState.GetCurrentExperienceCap();
+
+
+                Logger.LogLine("[SGBarracksRosterSlot_Refresh_POSTFIX] (" + ___pilot.Name + ") AbsoluteExperience: " + AbsoluteExperience);
 
                 string AbsoluteExperienceString = "";
                 string xpSoftCapString = Utilities.WrapWithColor(xpSoftCap, "medGray");
