@@ -20,7 +20,7 @@
         "xpMissionMechKilled": 100,
         "xpMissionOtherKilled": 50,
 
-        "ApplyPilotRespec": true,
+        "ApplyPilotRespec": false,
         "ForcePilotRespec": false,
         "CommanderRespec": true
     }
