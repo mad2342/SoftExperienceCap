@@ -549,18 +549,18 @@ namespace SoftExperienceCap
 
                 if (xpModifierLanceWeight > 0)
                 {
-                    Details += "<b>LANCE WEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpModifierLanceWeight + "XP</color></b>\n\n";
+                    Details += "<b>LANCE RATING:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpModifierLanceWeight + "XP</color></b>\n\n";
                     Details += "This pilots lance had to cope with the extra stress of facing overwhelming enemy forces.";
                 }
                 else if (xpModifierLanceWeight < 0)
                 {
-                    Details += "<b>LANCE WEIGHT:<color=#" + ColorUtility.ToHtmlStringRGBA(red) + "> " + xpModifierLanceWeight + "XP</color></b>\n\n";
+                    Details += "<b>LANCE RATING:<color=#" + ColorUtility.ToHtmlStringRGBA(red) + "> " + xpModifierLanceWeight + "XP</color></b>\n\n";
                     Details += "This pilots lance outmatched the enemy forces resulting in less valuable combat experience.";
                 }
                 else
                 {
-                    Details += "<b>LANCE WEIGHT: " + xpModifierLanceWeight + "XP</b>\n\n";
-                    Details += "This pilots lance rating was en par with the encountered enemy forces.";
+                    Details += "<b>LANCE RATING: " + xpModifierLanceWeight + "XP</b>\n\n";
+                    Details += "This pilots lance was en par with the encountered enemy forces.";
                 }
                 /*
                 Details += "\n\n";
