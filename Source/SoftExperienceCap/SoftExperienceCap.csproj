@@ -43,6 +43,7 @@
   <ItemGroup>
     <None Include="mod.json" />
     <None Include="README.md" />
+    <None Include="StreamingAssets\data\simGameConstants\SimGameConstants.json" />
     <None Include="StreamingAssets\data\shipUpgrades\argoUpgrade_trainingModule1.json" />
     <None Include="StreamingAssets\data\shipUpgrades\argoUpgrade_trainingModule2.json" />
     <None Include="StreamingAssets\data\shipUpgrades\argoUpgrade_trainingModule3.json" />
@@ -65,6 +66,7 @@ xcopy $(TargetPath) $(SolutionDir)..\Release\$(TargetName)\ /Y
 xcopy $(ProjectDir)mod.json $(SolutionDir)..\Release\$(TargetName)\ /Y
 xcopy $(ProjectDir)README.md $(SolutionDir)..\Release\$(TargetName)\ /Y
 xcopy $(ProjectDir)README.md $(SolutionDir)..\ /Y
+xcopy $(ProjectDir)StreamingAssets\data\simGameConstants\*.json $(SolutionDir)..\Release\$(TargetName)\StreamingAssets\data\simGameConstants\ /Y
 xcopy $(ProjectDir)StreamingAssets\data\shipUpgrades\*.json $(SolutionDir)..\Release\$(TargetName)\StreamingAssets\data\shipUpgrades\ /Y
 	</PostBuildEvent>
   </PropertyGroup>
