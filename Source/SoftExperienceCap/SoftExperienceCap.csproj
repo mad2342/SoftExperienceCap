@@ -33,8 +33,10 @@
     <Prefer32Bit>false</Prefer32Bit>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="..\..\..\Link\MadLogger.cs">
+      <Link>MadLogger.cs</Link>
+    </Compile>
     <Compile Include="Extensions.cs" />
-    <Compile Include="Logger.cs" />
     <Compile Include="Settings.cs" />
     <Compile Include="SoftExperienceCap.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />

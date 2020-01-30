@@ -16,33 +16,35 @@ namespace SoftExperienceCap
 {
     public class SoftExperienceCap
     {
+        internal static string LogPath;
         internal static string ModDirectory;
         internal static Settings Settings;
-
-        // BEN: Debug (0: nothing, 1: errors, 2:all)
+        // BEN: DebugLevel (0: nothing, 1: error, 2: debug, 3: info)
         internal static int DebugLevel = 2;
 
         internal static string xpCapByArgoStateEffectString = "• Mission experience can be fully utilized up to a total of {0} points.";
         internal static string CampaignCommanderUpdateTag = "soft_experience_cap_applied";
 
-
-
         public static void Init(string directory, string settings)
         {
-            var harmony = HarmonyInstance.Create("de.mad.SoftExperienceCap");
-            harmony.PatchAll(Assembly.GetExecutingAssembly());
-
             ModDirectory = directory;
-            File.CreateText($"{SoftExperienceCap.ModDirectory}/SoftExperienceCap.log");
+            LogPath = Path.Combine(ModDirectory, "SoftExperienceCap.log");
+
+            Logger.Initialize(LogPath, DebugLevel, ModDirectory, nameof(SoftExperienceCap));
 
             try
             {
                 Settings = JsonConvert.DeserializeObject<Settings>(settings);
             }
-            catch (Exception)
+            catch (Exception e)
             {
                 Settings = new Settings();
+                Logger.Error(e);
             }
+
+            // Harmony calls need to go last here because their Prepare() methods directly check Settings...
+            HarmonyInstance harmony = HarmonyInstance.Create("de.mad.SoftExperienceCap");
+            harmony.PatchAll(Assembly.GetExecutingAssembly());
         }
     }
 
@@ -82,7 +84,7 @@ namespace SoftExperienceCap
         {
             try
             {
-                Logger.LogLine("[SGShipModuleUpgradeViewPopulator_BuildEffectsString_POSTFIX] CurrentUpgrade.Description.Id: " + ___CurrentUpgrade.Description.Id);
+                Logger.Debug("[SGShipModuleUpgradeViewPopulator_BuildEffectsString_POSTFIX] CurrentUpgrade.Description.Id: " + ___CurrentUpgrade.Description.Id);
 
                 // @ToDo: Store numbers in vars/settings
                 if (___CurrentUpgrade.Description.Id == "argoUpgrade_trainingModule1")
@@ -103,7 +105,7 @@ namespace SoftExperienceCap
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -120,20 +122,20 @@ namespace SoftExperienceCap
             {
                 PilotDef pDef = p.pilotDef;
 
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") ExperienceSpent: " + pDef.ExperienceSpent);
+                Logger.Info("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") ExperienceSpent: " + pDef.ExperienceSpent);
 
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
+                Logger.Info("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
                 
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") TotalXP: " + p.TotalXP);
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") UnspentXP: " + p.UnspentXP);
+                Logger.Info("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") TotalXP: " + p.TotalXP);
+                Logger.Info("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") UnspentXP: " + p.UnspentXP);
 
                 int AbsoluteExperience = AbsoluteExperienceSpent + p.UnspentXP;
-                Logger.LogLine("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
+                Logger.Info("[SGBarracksWidget_OnPilotSelected_POSTFIX] (" + p.Name + ") AbsoluteExperience: " + AbsoluteExperience);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -153,15 +155,15 @@ namespace SoftExperienceCap
                 // Check XP beforehand
                 foreach(UnitResult unitResult in __instance.PlayerUnitResults)
                 {
-                    Logger.LogLine("[Contract_CompleteContract_POSTFIX] (" + unitResult.pilot.Callsign + ") UnspentXP: " + unitResult.pilot.UnspentXP);
+                    Logger.Debug("[Contract_CompleteContract_POSTFIX] (" + unitResult.pilot.Callsign + ") UnspentXP: " + unitResult.pilot.UnspentXP);
                 }
 
                 // Same for ALL pilots by default
-                Logger.LogLine("[Contract_CompleteContract_POSTFIX] ExperienceEarned: " + __instance.ExperienceEarned);
+                Logger.Debug("[Contract_CompleteContract_POSTFIX] ExperienceEarned: " + __instance.ExperienceEarned);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -175,7 +177,7 @@ namespace SoftExperienceCap
         {
             try
             {
-                Logger.LogLine("[SimGameState_ResolveCompleteContract_PREFIX] __instance.CompletedContract.ExperienceEarned BEFORE: " + __instance.CompletedContract.ExperienceEarned);
+                Logger.Debug("[SimGameState_ResolveCompleteContract_PREFIX] __instance.CompletedContract.ExperienceEarned BEFORE: " + __instance.CompletedContract.ExperienceEarned);
 
                 // BEN: Setting XP has already happened in patched AAR_UnitStatusWidget.FillInPilotData() -> Nullifying XP here.
                 Contract CompletedContract = (Contract)AccessTools.Property(typeof(SimGameState), "CompletedContract").GetValue(__instance, null);
@@ -184,11 +186,11 @@ namespace SoftExperienceCap
                 // Set
                 new Traverse(CompletedContract).Property("ExperienceEarned").SetValue(0);
                 
-                Logger.LogLine("[SimGameState_ResolveCompleteContract_PREFIX] __instance.CompletedContract.ExperienceEarned AFTER: " + __instance.CompletedContract.ExperienceEarned);
+                Logger.Debug("[SimGameState_ResolveCompleteContract_PREFIX] __instance.CompletedContract.ExperienceEarned AFTER: " + __instance.CompletedContract.ExperienceEarned);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -201,11 +203,11 @@ namespace SoftExperienceCap
         {
             try
             {
-                Logger.LogLine("[PilotDef_SetUnspentExperience_PREFIX] (" + __instance.Description.Callsign + ") value: " + value);
+                Logger.Debug("[PilotDef_SetUnspentExperience_PREFIX] (" + __instance.Description.Callsign + ") value: " + value);
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -222,13 +224,13 @@ namespace SoftExperienceCap
                 // Check mission state
                 Contract.ContractState state = ___contract.State;
                 bool missionComplete = state == Contract.ContractState.Complete;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Mission complete: " + missionComplete);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Mission complete: " + missionComplete);
                 bool missionFailed = state == Contract.ContractState.Failed;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Mission failed: " + missionFailed);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Mission failed: " + missionFailed);
                 bool missionRetreatedGoodFaith = state == Contract.ContractState.Retreated && ___contract.IsGoodFaithEffort;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Withdrawed (Good Faith): " + missionRetreatedGoodFaith);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Withdrawed (Good Faith): " + missionRetreatedGoodFaith);
                 bool missionRetreatedBadFaith = state == Contract.ContractState.Retreated && !___contract.IsGoodFaithEffort;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Withdrawed (Bad Faith): " + missionRetreatedBadFaith);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Withdrawed (Bad Faith): " + missionRetreatedBadFaith);
 
                 // RETURN EARLY when absolutely no XP were earned
                 if (xpEarned <= 0)
@@ -238,16 +240,16 @@ namespace SoftExperienceCap
 
                 // Determine modifier for partial mission completion via XP comparison
                 int xpPotentialMission = Mathf.FloorToInt((float)___contract.Override.finalDifficulty * ___simState.Constants.Pilot.BaseXPGainPerMission);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpPotentialMission: " + xpPotentialMission);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned: " + xpEarned);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpPotentialMission: " + xpPotentialMission);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned: " + xpEarned);
                 double xpBonusModifier = (double)xpEarned / xpPotentialMission;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpBonusModifier: " + xpBonusModifier.ToString());
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpBonusModifier: " + xpBonusModifier.ToString());
 
                 // Early limit if applicable
                 if (SoftExperienceCap.Settings.xpMissionMaximum > 0 && xpEarned > SoftExperienceCap.Settings.xpMissionMaximum)
                 {
                     xpEarned = SoftExperienceCap.Settings.xpMissionMaximum;
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned exceeded configured maximum. Limited to: " + xpEarned);
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpEarned exceeded configured maximum. Limited to: " + xpEarned);
                 }
 
                 Pilot p = ___UnitData.pilot;
@@ -261,21 +263,21 @@ namespace SoftExperienceCap
                 int xpHardLimit = 114000; // All skills at 10
 
                 int xpSoftCap = ___simState.GetCurrentExperienceCap();
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Current xpSoftCap: " + xpSoftCap);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] Current xpSoftCap: " + xpSoftCap);
 
                 int AbsoluteExperienceSpent = Utilities.GetAbsoluteExperienceSpent(pDef, ___simState);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") AbsoluteExperienceSpent: " + AbsoluteExperienceSpent);
 
                 int PreMissionUnspentXP = p.UnspentXP;
                 int PostMissionUnspentXP = p.UnspentXP + xpEarned;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionUnspentXP: " + PreMissionUnspentXP);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PostMissionUnspentXP: " + PostMissionUnspentXP);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionUnspentXP: " + PreMissionUnspentXP);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PostMissionUnspentXP: " + PostMissionUnspentXP);
 
                 int PreMissionAbsoluteExperience = AbsoluteExperienceSpent + PreMissionUnspentXP;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionAbsoluteExperience: " + PreMissionAbsoluteExperience);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PreMissionAbsoluteExperience: " + PreMissionAbsoluteExperience);
 
                 int PotentialExperiencePostMission = AbsoluteExperienceSpent + PostMissionUnspentXP;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PotentialExperiencePostMission: " + PotentialExperiencePostMission);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") PotentialExperiencePostMission: " + PotentialExperiencePostMission);
 
 
 
@@ -292,7 +294,7 @@ namespace SoftExperienceCap
                     xpMission = 0;
                     xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(red) + ">";
 
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was at BTGs absolute maximum. Gaining no XP for the mission.");
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was at BTGs absolute maximum. Gaining no XP for the mission.");
                 }
                 // Only minimum XP if already at XPCap before mission
                 else if (PreMissionAbsoluteExperience >= xpSoftCap)
@@ -300,7 +302,7 @@ namespace SoftExperienceCap
                     xpMission = xpMinimum;
                     xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
 
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was already above cap. Gaining only minimum XP for the mission.");
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience was already above cap. Gaining only minimum XP for the mission.");
                 }
                 // Not more than XPCap + minimum XP
                 else if (PreMissionAbsoluteExperience < xpSoftCap && PotentialExperiencePostMission >= xpSoftCap)
@@ -308,7 +310,7 @@ namespace SoftExperienceCap
                     xpMission = (xpSoftCap - PreMissionAbsoluteExperience) + xpMinimum;
                     xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + ">";
 
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP for the mission.");
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is hitting cap. Gaining less XP for the mission.");
                 }
                 // Normal XP
                 else
@@ -316,10 +318,10 @@ namespace SoftExperienceCap
                     xpMission = xpOriginal;
                     xpCapInfoColorTag = "<color=#" + ColorUtility.ToHtmlStringRGBA(green) + ">";
 
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is below cap. Gaining normal XP for the mission.");
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") Experience is below cap. Gaining normal XP for the mission.");
                 }
                 xpTemp += xpMission;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpMission: " + xpMission);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpMission: " + xpMission);
 
 
 
@@ -334,7 +336,7 @@ namespace SoftExperienceCap
                     xpBonusFromKills += SoftExperienceCap.Settings.xpMissionOtherKilled;
                 }
                 xpTemp += xpBonusFromKills;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusFromKills: " + xpBonusFromKills);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusFromKills: " + xpBonusFromKills);
 
 
 
@@ -342,7 +344,7 @@ namespace SoftExperienceCap
                 int xpBonusUnderstaffedBase = (int)(200 * xpBonusModifier);
                 int xpBonusUnderstaffed = 0;
                 int playerUnitCount = ___contract.PlayerUnitResults.Count;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] playerUnitCount: " + playerUnitCount);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] playerUnitCount: " + playerUnitCount);
                 switch (playerUnitCount)
                 {
                     case 3:
@@ -359,7 +361,7 @@ namespace SoftExperienceCap
                         break;
                 }
                 xpTemp += xpBonusUnderstaffed;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusUnderstaffed: " + xpBonusUnderstaffed);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusUnderstaffed: " + xpBonusUnderstaffed);
 
 
 
@@ -367,7 +369,7 @@ namespace SoftExperienceCap
                 int xpBonusUndamagedBase = (int)(100 * xpBonusModifier);
                 int xpBonusUndamaged = ___UnitData.mech.IsDamaged ? 0 : xpBonusUndamagedBase;
                 xpTemp += xpBonusUndamaged;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusUndamaged: " + xpBonusUndamaged);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusUndamaged: " + xpBonusUndamaged);
 
 
 
@@ -377,7 +379,7 @@ namespace SoftExperienceCap
 
                 //@ToDo: Check _finalDifficulty from ContractOverride?
                 int contractDifficulty = ___contract.Difficulty;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
 
                 float combinedTonnage = 0f;
                 int lanceTonnageRating = 0;
@@ -386,7 +388,7 @@ namespace SoftExperienceCap
                 {
                     combinedTonnage += unitResult.mech.Chassis.Tonnage;
                 }
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] combinedTonnage: " + combinedTonnage);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] combinedTonnage: " + combinedTonnage);
                 for (int i = 0; i < ___simState.Constants.MechLab.LanceDropTonnageBrackets.Length; i++)
                 {
                     if (combinedTonnage >= (float)___simState.Constants.MechLab.LanceDropTonnageBrackets[i])
@@ -394,14 +396,14 @@ namespace SoftExperienceCap
                         lanceTonnageRating = i + 1;
                     }
                 }
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] lanceTonnageRating: " + lanceTonnageRating);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] lanceTonnageRating: " + lanceTonnageRating);
                 //if (lanceTonnageRating < contractDifficulty)
                 //{
                     xpModifierLanceWeight = (contractDifficulty - lanceTonnageRating) * xpModifierLanceWeightBase;
                 //}
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpModifierLanceWeight: " + xpModifierLanceWeight);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] xpModifierLanceWeight: " + xpModifierLanceWeight);
                 xpTemp += xpModifierLanceWeight;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpModifierLanceWeight: " + xpModifierLanceWeight);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpModifierLanceWeight: " + xpModifierLanceWeight);
 
 
 
@@ -417,10 +419,10 @@ namespace SoftExperienceCap
                     alliesLost += unitResult.pilot.IsIncapacitated ? 1 : 0;
                     alliesLost += unitResult.pilot.HasEjected ? 1 : 0;
                 }
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") IsIncapacitated: " + p.IsIncapacitated);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") HasEjected: " + p.HasEjected);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] playerUnitResults.Count: " + playerUnitResults.Count);
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] alliesLost: " + alliesLost);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") IsIncapacitated: " + p.IsIncapacitated);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") HasEjected: " + p.HasEjected);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] playerUnitResults.Count: " + playerUnitResults.Count);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] alliesLost: " + alliesLost);
 
                 // Only if not part of alliesLost themselves AND only if mission was completed
                 if (alliesLost > 0 && !p.IsIncapacitated && !p.HasEjected && missionComplete)
@@ -428,7 +430,7 @@ namespace SoftExperienceCap
                     xpBonusLastOnesStanding = alliesLost * xpBonusLastOnesStandingBase;
                 }
                 xpTemp += xpBonusLastOnesStanding;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusLastOnesStanding: " + xpBonusLastOnesStanding);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusLastOnesStanding: " + xpBonusLastOnesStanding);
                 */
 
 
@@ -443,7 +445,7 @@ namespace SoftExperienceCap
 
                 // Adjust unspent experience 
                 int AdjustedUnspentXP = PreMissionUnspentXP + xpTemp;
-                Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AdjustedUnspentXP: " + AdjustedUnspentXP);
+                Logger.Debug("[AAR_UnitStatusWidget_FillInData_PREFIX] (" + p.Name + ") AdjustedUnspentXP: " + AdjustedUnspentXP);
                 p.StatCollection.Set<int>("ExperienceUnspent", AdjustedUnspentXP);
                 pDef.SetUnspentExperience(AdjustedUnspentXP);
 
@@ -495,7 +497,7 @@ namespace SoftExperienceCap
                 }
                 else
                 {
-                    Logger.LogLine("[AAR_UnitStatusWidget_FillInData_PREFIX] Unknown mission state.");
+                    Logger.Debug("[AAR_UnitStatusWidget_FillInData_PREFIX] Unknown mission state.");
                 }
 
                 // Bonus XP details
@@ -585,7 +587,7 @@ namespace SoftExperienceCap
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -611,7 +613,7 @@ namespace SoftExperienceCap
                 int xpSoftCap = simGameState.GetCurrentExperienceCap();
 
 
-                Logger.LogLine("[SGBarracksRosterSlot_Refresh_POSTFIX] (" + ___pilot.Name + ") AbsoluteExperience: " + AbsoluteExperience);
+                Logger.Debug("[SGBarracksRosterSlot_Refresh_POSTFIX] (" + ___pilot.Name + ") AbsoluteExperience: " + AbsoluteExperience);
 
                 string AbsoluteExperienceString = "";
                 string xpSoftCapString = Utilities.WrapWithColor(xpSoftCap, "medGray");
@@ -651,7 +653,7 @@ namespace SoftExperienceCap
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
@@ -707,7 +709,7 @@ namespace SoftExperienceCap
             }
             catch (Exception e)
             {
-                Logger.LogError(e);
+                Logger.Error(e);
             }
         }
     }
