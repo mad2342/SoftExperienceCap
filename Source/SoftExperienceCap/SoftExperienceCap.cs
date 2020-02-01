@@ -377,7 +377,7 @@ namespace SoftExperienceCap
                 int xpModifierLanceWeightBase = (int)(100 * xpBonusModifier);
                 int xpModifierLanceWeight = 0;
 
-                //@ToDo: Check _finalDifficulty from ContractOverride?
+                //@ToDo: Check _finalDifficulty from ContractOverride? (___contract.Override.finalDifficulty)
                 int contractDifficulty = ___contract.Difficulty;
                 Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] contractDifficulty: " + contractDifficulty);
 
@@ -407,10 +407,13 @@ namespace SoftExperienceCap
 
 
 
+                // Penalty for early ejection?
+
+
+
                 // Bonus XP for completing mission even though friendly units were lost?
                 // NOTE that due to a vanilla bug sometimes ejected pilots don't get reported as that (and the head of their Mech won't get destroyed)
-                // Commenting out until this is fixed.
-                /*
+                // Check if this is fixed.
                 int xpBonusLastOnesStandingBase = (int)(200 * xpBonusModifier);
                 int xpBonusLastOnesStanding = 0;
                 int alliesLost = 0;
@@ -431,7 +434,6 @@ namespace SoftExperienceCap
                 }
                 xpTemp += xpBonusLastOnesStanding;
                 Logger.Debug("[AAR_UnitStatusWidget_FillInPilotData_PREFIX] (" + p.Name + ") xpBonusLastOnesStanding: " + xpBonusLastOnesStanding);
-                */
 
 
 
@@ -564,7 +566,6 @@ namespace SoftExperienceCap
                     Details += "<b>LANCE RATING: " + xpModifierLanceWeight + "XP</b>\n\n";
                     Details += "This pilots lance was en par with the encountered enemy forces.";
                 }
-                /*
                 Details += "\n\n";
 
                 if (xpBonusLastOnesStanding > 0)
@@ -572,7 +573,6 @@ namespace SoftExperienceCap
                     Details += "<b>LAST ONES STANDING:<color=#" + ColorUtility.ToHtmlStringRGBA(gold) + "> +" + xpBonusLastOnesStanding + "XP</color></b>\n\n";
                     Details += "This pilot has lost lance mates during the course of the mission but could make up for it.";
                 }
-                */
 
 
 
